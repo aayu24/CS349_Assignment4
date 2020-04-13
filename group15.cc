@@ -14,6 +14,14 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+// Network topology
+//
+//       n0 ----------- n1
+//            1 Mbps
+//             10 ms
+//
+// - Flow from n0 to n1 using BulkSendApplication.
+
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -34,54 +42,12 @@
 #include <ns3/scheduler.h>
 #include <ns3/calendar-scheduler.h>
 #include <ns3/gnuplot.h>
-//#include "myapp.h"
 
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE ("FifthScriptExample");
+NS_LOG_COMPONENT_DEFINE ("TCP_Comparison");
 
-// ===========================================================================
-//
-//         node 0                 node 1
-//   +----------------+    +----------------+
-//   |    ns-3 TCP    |    |    ns-3 TCP    |
-//   +----------------+    +----------------+
-//   |    10.1.1.1    |    |    10.1.1.2    |
-//   +----------------+    +----------------+
-//   | point-to-point |    | point-to-point |
-//   +----------------+    +----------------+
-//           |                     |
-//           +---------------------+
-//                5 Mbps, 2 ms
-//
-//
-// We want to look at changes in the ns-3 TCP congestion window.  We need
-// to crank up a flow and hook the CongestionWindow attribute on the socket
-// of the sender.  Normally one would use an on-off application to generate a
-// flow, but this has a couple of problems.  First, the socket of the on-off
-// application is not created until Application Start time, so we wouldn't be
-// able to hook the socket (now) at configuration time.  Second, even if we
-// could arrange a call after start time, the socket is not public so we
-// couldn't get at it.
-//
-// So, we can cook up a simple version of the on-off application that does what
-// we want.  On the plus side we don't need all of the complexity of the on-off
-// application.  On the minus side, we don't have a helper, so we have to get
-// a little more involved in the details, but this is trivial.
-//
-// So first, we create a socket and do the trace connect on it; then we pass
-// this socket into the constructor of our simple application which we then
-// install in the source node.
-// ===========================================================================
-//
-
-  
-  // fs1.open ("congestion.txt", std::fstream::in | std::fstream::out | std::fstream::app);
-  // fs2.open ("dropped.txt", std::fstream::in | std::fstream::out | std::fstream::app);
-  // fs3.open ("transferBytes.txt", std::fstream::in | std::fstream::out | std::fstream::app);
-std::ofstream fs1("og_congestion.txt", std::ofstream::out),
-  fs2("og_dropped.txt", std::ofstream::out),
-  fs3("og_transferBytes.txt", std::ofstream::out);
+  AsciiTraceHelper ascii;
 
 class MyApp : public Application
 {
@@ -186,20 +152,20 @@ MyApp::ScheduleTx (void)
 }
 
 static void
-CwndChange (uint32_t oldCwnd, uint32_t newCwnd)
+CwndChange (Ptr<OutputStreamWrapper> stream, uint32_t oldCwnd, uint32_t newCwnd)
 {
-  fs1 << Simulator::Now ().GetSeconds () << "\t" << newCwnd << "\n";
+  *stream->GetStream() << Simulator::Now ().GetSeconds () << "\t" << newCwnd << "\n";
 }
 
 static void
-RxDrop (Ptr<const Packet> p)
+RxDrop (Ptr<OutputStreamWrapper> stream, Ptr<const Packet> p)
 {
   static int i=1;
-  fs2 << Simulator::Now ().GetSeconds () << "\t" << i << "\n";
+  *stream->GetStream() << Simulator::Now ().GetSeconds () << "\t" << i << "\n";
   i++;
 }
 
-void ThroughputMonitor (FlowMonitorHelper *fmhelper, Ptr<FlowMonitor> flowMon,Gnuplot2dDataset DataSet)
+void ThroughputMonitor (Ptr<OutputStreamWrapper> stream, FlowMonitorHelper *fmhelper, Ptr<FlowMonitor> flowMon,Gnuplot2dDataset DataSet)
 {
   static double time = 0;
   double localThrou=0;
@@ -210,9 +176,9 @@ void ThroughputMonitor (FlowMonitorHelper *fmhelper, Ptr<FlowMonitor> flowMon,Gn
     localThrou += stats->second.rxBytes;
     DataSet.Add((double)Simulator::Now().GetSeconds(),(double) localThrou);
   }
-  fs3 << time << "\t" << localThrou << '\n';
+  *stream->GetStream() << time << "\t" << localThrou << '\n';
   time += 0.1;
-  Simulator::Schedule(Seconds(0.1),&ThroughputMonitor, fmhelper, flowMon,DataSet);
+  Simulator::Schedule(Seconds(0.1),&ThroughputMonitor, stream , fmhelper, flowMon,DataSet);
   {
     flowMon->SerializeToXmlFile ("ThroughputMonitor.xml", true, true);
   }
@@ -245,12 +211,20 @@ main (int argc, char *argv[])
         Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpScalable::GetTypeId()));
       else if(tcp_variant.compare("TcpHybla") ==0)
         Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpHybla::GetTypeId()));
-    else
-    {
-      fprintf (stderr, "Invalid TCP version\n");
-      exit (1);
-    }
+      else
+      {
+        fprintf (stderr, "Invalid TCP version\n");
+        exit (1);
+      }
 
+      std::string a_s = "bytes_"+tcp_variant+".txt";
+      std::string b_s = "dropped_"+tcp_variant+".txt";
+      std::string c_s = "cwnd_"+tcp_variant+".txt";
+
+    // Create file streams for data storage
+    Ptr<OutputStreamWrapper> total_bytes_data = ascii.CreateFileStream (a_s);
+    Ptr<OutputStreamWrapper> dropped_packets_data = ascii.CreateFileStream (b_s);
+    Ptr<OutputStreamWrapper> cwnd_data = ascii.CreateFileStream (c_s);
     
 
   // creating nodes
@@ -293,7 +267,8 @@ main (int argc, char *argv[])
   Ptr<Socket> ns3TcpSocket1 = Socket::CreateSocket (nodes.Get (0), TcpSocketFactory::GetTypeId ()); // source at no
 
   // Trace CongestionWindow
-  ns3TcpSocket1->TraceConnectWithoutContext ("CongestionWindow", MakeCallback (&CwndChange));
+  ns3TcpSocket1->TraceConnectWithoutContext ("CongestionWindow", MakeBoundCallback (&CwndChange,cwnd_data));
+
 
   // create TCP application at n0
   Ptr<MyApp> tcp_ftp_agent = CreateObject<MyApp> ();
@@ -302,7 +277,7 @@ main (int argc, char *argv[])
   tcp_ftp_agent->SetStartTime (Seconds (0.));
   tcp_ftp_agent->SetStopTime (Seconds (simulation_time));
 
-  devices.Get(1)->TraceConnectWithoutContext ("PhyRxDrop", MakeCallback (&RxDrop));
+  devices.Get(1)->TraceConnectWithoutContext ("PhyRxDrop", MakeBoundCallback (&RxDrop,dropped_packets_data));
 
   // udp application 1
 
@@ -404,7 +379,7 @@ main (int argc, char *argv[])
   FlowMonitorHelper flowHelper;
   flowMonitor = flowHelper.InstallAll();
 
-  ThroughputMonitor(&flowHelper, flowMonitor, dataset); //Call ThroughputMonitor Function
+  ThroughputMonitor(total_bytes_data, &flowHelper, flowMonitor, dataset); //Call ThroughputMonitor Function
   flowMonitor->SerializeToXmlFile("FlowMonitor-Throughput.xml", true, true);
 
   Simulator::Stop (Seconds (simulation_time));
@@ -416,9 +391,6 @@ main (int argc, char *argv[])
   flowMonitor->SerializeToXmlFile("lab-4.xml", true, true);
 
   Simulator::Destroy ();
-  fs1.close();
-  fs2.close();
-  fs3.close();
 
   return 0;
 }
