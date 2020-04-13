@@ -56,7 +56,7 @@ public:
   MyApp ();
   virtual ~MyApp();
 
-  void Setup (Ptr<Socket> socket, Address address, uint32_t packetSize, uint32_t nPackets, DataRate dataRate);
+  void Setup (Ptr<Socket> socket, Address address, uint32_t pktSize, uint32_t numPkt, DataRate dataRate);
 
 private:
   virtual void StartApplication (void);
@@ -65,77 +65,77 @@ private:
   void ScheduleTx (void);
   void SendPacket (void);
 
-  Ptr<Socket>     m_socket;
-  Address         m_peer;
-  uint32_t        m_packetSize;
-  uint32_t        m_nPackets;
-  DataRate        m_dataRate;
-  EventId         m_sendEvent;
-  bool            m_running;
-  uint32_t        m_packetsSent;
+  Ptr<Socket>     app_socket;
+  Address         app_peer;
+  uint32_t        app_pktSize;
+  uint32_t        app_numPkt;
+  DataRate        app_dataRate;
+  EventId         app_sendEvent;
+  bool            app_running;
+  uint32_t        app_packetsSent;
 };
 
 MyApp::MyApp ()
-  : m_socket (0),
-    m_peer (),
-    m_packetSize (0),
-    m_nPackets (0),
-    m_dataRate (0),
-    m_sendEvent (),
-    m_running (false),
-    m_packetsSent (0)
+  : app_socket (0),
+    app_peer (),
+    app_pktSize (0),
+    app_numPkt (0),
+    app_dataRate (0),
+    app_sendEvent (),
+    app_running (false),
+    app_packetsSent (0)
 {
 }
 
 MyApp::~MyApp()
 {
-  m_socket = 0;
+  app_socket = 0;
 }
 
 void
-MyApp::Setup (Ptr<Socket> socket, Address address, uint32_t packetSize, uint32_t nPackets, DataRate dataRate)
+MyApp::Setup (Ptr<Socket> socket, Address address, uint32_t pktSize, uint32_t numPkt, DataRate dataRate)
 {
-  m_socket = socket;
-  m_peer = address;
-  m_packetSize = packetSize;
-  m_nPackets = nPackets;
-  m_dataRate = dataRate;
+  app_socket = socket;
+  app_peer = address;
+  app_pktSize = pktSize;
+  app_numPkt = numPkt;
+  app_dataRate = dataRate;
 
 }
 
 void
 MyApp::StartApplication (void)
 {
-  m_running = true;
-  m_packetsSent = 0;
-  m_socket->Bind ();
-  m_socket->Connect (m_peer);
+  app_running = true;
+  app_packetsSent = 0;
+  app_socket->Bind ();
+  app_socket->Connect (app_peer);
   SendPacket ();
 }
 
 void
 MyApp::StopApplication (void)
 {
-  m_running = false;
+  app_running = false;
 
-  if (m_sendEvent.IsRunning ())
+  if (app_sendEvent.IsRunning ())
     {
-      Simulator::Cancel (m_sendEvent);
+      Simulator::Cancel (app_sendEvent);
     }
 
-  if (m_socket)
+  if (app_socket)
     {
-      m_socket->Close ();
+      app_socket->Close ();
     }
 }
 
 void
 MyApp::SendPacket (void)
 {
-  Ptr<Packet> packet = Create<Packet> (m_packetSize);
-  m_socket->Send (packet);
+  Ptr<Packet> packet = Create<Packet> (app_pktSize);
+  app_socket->Send (packet);
 
-  if (++m_packetsSent < m_nPackets)
+  if (++app_packetsSent < app_numPkt)
     {
       ScheduleTx ();
     }
@@ -144,13 +144,16 @@ MyApp::SendPacket (void)
 void
 MyApp::ScheduleTx (void)
 {
-  if (m_running)
+  if (app_running)
     {
-      Time tNext (Seconds (m_packetSize * 8 / static_cast<double> (m_dataRate.GetBitRate ())));
-      m_sendEvent = Simulator::Schedule (tNext, &MyApp::SendPacket, this);
+      Time tNext (Seconds (app_pktSize * 8 / static_cast<double> (app_dataRate.GetBitRate ())));
+      app_sendEvent = Simulator::Schedule (tNext, &MyApp::SendPacket, this);
     }
 }
 
+/*--------------------class definitions over----------------------*/
+
+//to keep track of changes in congestion window, using callbacks  from TCP when window is changed
 static void
 CwndChange (Ptr<OutputStreamWrapper> stream, uint32_t oldCwnd, uint32_t newCwnd)
 {
@@ -183,7 +186,12 @@ void ThroughputMonitor (Ptr<OutputStreamWrapper> stream, FlowMonitorHelper *fmhe
     flowMon->SerializeToXmlFile ("ThroughputMonitor.xml", true, true);
   }
 }
+void menu()
+{
+  std::cout<<"Enter [1-5] for TCP varient:\n1. TCP New Reno\n2. TCP Hybla\n3. TCP Westwood\n4. TCP Scalable\n5. TCP Vegas\n";
+}
 
+/*------------------------ Helper functions defined --------------------*/
 int
 main (int argc, char *argv[])
 {
@@ -191,15 +199,50 @@ main (int argc, char *argv[])
   float simulation_time = 1.8; //seconds
    //change these parameters for different simulations
     std::string tcp_variant;
-    std:: cout << "Enter Tcp Tcp variant\n";
-    std::cin >> tcp_variant ;
+    int option;
+    menu();
+    std::cin>>option;
+    
+
+    switch (option)
+    {
+      case 1:
+      tcp_variant = "TcpNewReno";
+      Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpNewReno::GetTypeId()));
+      break;
+
+      case 2:
+      tcp_variant ="TcpHybla";
+      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpHybla::GetTypeId()));
+      break;
+
+      case 3:
+      tcp_variant ="TcpWestwood";
+      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpWestwood::GetTypeId ()));
+      Config::SetDefault ("ns3::TcpWestwood::FilterType", EnumValue (TcpWestwood::TUSTIN));
+      break;
+
+      case 4:
+      tcp_variant ="TcpScalable";
+      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpScalable::GetTypeId()));
+      break;
+
+      case 5:
+      tcp_variant ="TcpVegas";
+      Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpVegas::GetTypeId ()));
+      break;
+
+      default:
+      fprintf (stderr, "Invalid TCP version\n");
+      exit (1);
+    }
 
     // if (tcp_variant.compare("TcpTahoe") == 0)
       // Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpTahoe::GetTypeId()));
     // else if (tcp_variant.compare("TcpReno") == 0)
     //   Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpReno::GetTypeId()));
     // else 
-      if (tcp_variant.compare("TcpNewReno") == 0)
+/*      if (tcp_variant.compare("TcpNewReno") == 0)
         Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpNewReno::GetTypeId()));
       else if (tcp_variant.compare("TcpVegas") == 0)
         Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpVegas::GetTypeId ()));
@@ -216,7 +259,7 @@ main (int argc, char *argv[])
         fprintf (stderr, "Invalid TCP version\n");
         exit (1);
       }
-
+*/
       std::string a_s = "bytes_"+tcp_variant+".txt";
       std::string b_s = "dropped_"+tcp_variant+".txt";
       std::string c_s = "cwnd_"+tcp_variant+".txt";
@@ -230,21 +273,30 @@ main (int argc, char *argv[])
   // creating nodes
   NodeContainer nodes;
   nodes.Create (2);
+  NS_LOG_INFO ("Created 2 nodes.");
 
-  NodeContainer n0n1 = NodeContainer(nodes.Get(0), nodes.Get(1));
+  //NodeContainer n0n1 = NodeContainer(nodes.Get(0), nodes.Get(1));
 
   // Install internet stack
 
   InternetStackHelper stack;
   stack.Install (nodes);
+  NS_LOG_INFO ("Installed internet stacks on the nodes");
 
   PointToPointHelper pointToPoint;
   pointToPoint.SetQueue ("ns3::DropTailQueue");
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("1Mbps"));
   pointToPoint.SetChannelAttribute ("Delay", StringValue ("10ms"));
 
+  NS_LOG_INFO ("P2P link created....");
+  NS_LOG_INFO ("Bandwidth : 1Mbps");
+  NS_LOG_INFO ("Delay : 10ms");
+  NS_LOG_INFO ("Queue Type : DropTailQueue");
+
   NetDeviceContainer devices;
-  devices = pointToPoint.Install (n0n1);
+  devices = pointToPoint.Install (nodes);
+  NS_LOG_INFO ("Installing net device to nodes, adding MAC Address and Queue.");
+
 
   Ptr<RateErrorModel> error_model = CreateObject<RateErrorModel> ();
   error_model->SetAttribute ("ErrorRate", DoubleValue (0.00001));
@@ -253,6 +305,10 @@ main (int argc, char *argv[])
   Ipv4AddressHelper address;
   address.SetBase ("10.1.1.0", "255.255.255.252");
   Ipv4InterfaceContainer interfaces = address.Assign (devices);
+  NS_LOG_INFO ("Assigning IP base addresses to the nodes");
+
+
+
 
   // Turn on global static routing so we can actually be routed across the network.
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
@@ -369,6 +425,11 @@ main (int argc, char *argv[])
   fifth_cbr_agent->SetStartTime (Seconds (1.0));
   fifth_cbr_agent->SetStopTime (Seconds (1.6));
 
+  NS_LOG_INFO ("Applications created.");
+
+/*--------------Application creation ends----------------*/
+
+  //Configuring Analysis tools
   std::string dataTitle= "Throughput Data";
 
   Gnuplot2dDataset dataset;
@@ -382,8 +443,12 @@ main (int argc, char *argv[])
   ThroughputMonitor(total_bytes_data, &flowHelper, flowMonitor, dataset); //Call ThroughputMonitor Function
   flowMonitor->SerializeToXmlFile("FlowMonitor-Throughput.xml", true, true);
 
+
+
   Simulator::Stop (Seconds (simulation_time));
   Simulator::Run ();
+
+  //Analysis of simulation
   flowMonitor->CheckForLostPackets ();
   Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier> (flowHelper.GetClassifier ());
   std::map<FlowId, FlowMonitor::FlowStats> stats = flowMonitor->GetFlowStats ();
