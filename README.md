@@ -4,7 +4,9 @@ Lab submission for CS349 Assignment 4
 ## Build and Run
 
 To run add this file to the scratch folder inside your ns3 folder.
+
 Open a terminal in your ns3 directory.
+
 Then use the following command: ./waf --run scratch/group15
 
 ## Generate Output
