@@ -157,7 +157,7 @@ MyApp::ScheduleTx (void)
 static void
 CwndChange (Ptr<OutputStreamWrapper> stream, uint32_t oldCwnd, uint32_t newCwnd)
 {
-  *stream->GetStream() << Simulator::Now ().GetSeconds () << "\t" << newCwnd << "\n";
+  *stream->GetStream() << Simulator::Now ().GetSeconds () << "\t" << ((double)newCwnd/1000) << "\n";
 }
 
 static void
@@ -168,7 +168,7 @@ RxDrop (Ptr<OutputStreamWrapper> stream, Ptr<const Packet> p)
   i++;
 }
 
-void ThroughputMonitor (Ptr<OutputStreamWrapper> stream, FlowMonitorHelper *fmhelper, Ptr<FlowMonitor> flowMon,Gnuplot2dDataset DataSet)
+void ThroughputMonitor (Ptr<OutputStreamWrapper> stream, FlowMonitorHelper *fmhelper, Ptr<FlowMonitor> flowMon)
 {
   static double time = 0;
   double localThrou=0;
@@ -177,18 +177,17 @@ void ThroughputMonitor (Ptr<OutputStreamWrapper> stream, FlowMonitorHelper *fmhe
   for (std::map<FlowId, FlowMonitor::FlowStats>::const_iterator stats = flowStats.begin (); stats != flowStats.end (); ++stats)
   {
     localThrou += stats->second.rxBytes;
-    DataSet.Add((double)Simulator::Now().GetSeconds(),(double) localThrou);
   }
-  *stream->GetStream() << time << "\t" << localThrou << '\n';
-  time += 0.1;
-  Simulator::Schedule(Seconds(0.1),&ThroughputMonitor, stream , fmhelper, flowMon,DataSet);
+  *stream->GetStream() << time << "\t" << ((double)localThrou/1000) << '\n';
+  time += 0.005;
+  Simulator::Schedule(Seconds(0.005),&ThroughputMonitor, stream , fmhelper, flowMon);
   {
     flowMon->SerializeToXmlFile ("ThroughputMonitor.xml", true, true);
   }
 }
 void menu()
 {
-  std::cout<<"Enter [1-5] for TCP varient:\n1. TCP New Reno\n2. TCP Hybla\n3. TCP Westwood\n4. TCP Scalable\n5. TCP Vegas\n";
+  std::cout<<"Enter [1-5] for TCP variant:\n1. TCP New Reno\n2. TCP Hybla\n3. TCP Westwood\n4. TCP Scalable\n5. TCP Vegas\n";
 }
 
 /*------------------------ Helper functions defined --------------------*/
@@ -430,17 +429,11 @@ main (int argc, char *argv[])
 /*--------------Application creation ends----------------*/
 
   //Configuring Analysis tools
-  std::string dataTitle= "Throughput Data";
-
-  Gnuplot2dDataset dataset;
-  dataset.SetTitle (dataTitle);
-  dataset.SetStyle (Gnuplot2dDataset::LINES_POINTS);
-
   Ptr<FlowMonitor> flowMonitor;
   FlowMonitorHelper flowHelper;
   flowMonitor = flowHelper.InstallAll();
 
-  ThroughputMonitor(total_bytes_data, &flowHelper, flowMonitor, dataset); //Call ThroughputMonitor Function
+  ThroughputMonitor(total_bytes_data, &flowHelper, flowMonitor); //Call ThroughputMonitor Function
   flowMonitor->SerializeToXmlFile("FlowMonitor-Throughput.xml", true, true);
 
 
