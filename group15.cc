@@ -236,29 +236,7 @@ main (int argc, char *argv[])
       exit (1);
     }
 
-    // if (tcp_variant.compare("TcpTahoe") == 0)
-      // Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpTahoe::GetTypeId()));
-    // else if (tcp_variant.compare("TcpReno") == 0)
-    //   Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpReno::GetTypeId()));
-    // else 
-/*      if (tcp_variant.compare("TcpNewReno") == 0)
-        Config::SetDefault("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpNewReno::GetTypeId()));
-      else if (tcp_variant.compare("TcpVegas") == 0)
-        Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpVegas::GetTypeId ()));
-      else if (tcp_variant.compare ("TcpWestwood") == 0){ 
-        Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpWestwood::GetTypeId ()));
-        Config::SetDefault ("ns3::TcpWestwood::FilterType", EnumValue (TcpWestwood::TUSTIN));
-      }
-      else if(tcp_variant.compare("TcpScalable") ==0)
-        Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpScalable::GetTypeId()));
-      else if(tcp_variant.compare("TcpHybla") ==0)
-        Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue(TcpHybla::GetTypeId()));
-      else
-      {
-        fprintf (stderr, "Invalid TCP version\n");
-        exit (1);
-      }
-*/
+
       std::string a_s = "bytes_"+tcp_variant+".txt";
       std::string b_s = "dropped_"+tcp_variant+".txt";
       std::string c_s = "cwnd_"+tcp_variant+".txt";
