@@ -181,9 +181,6 @@ void ThroughputMonitor (Ptr<OutputStreamWrapper> stream, FlowMonitorHelper *fmhe
   *stream->GetStream() << time << "\t" << ((double)localThrou/1000) << '\n';
   time += 0.05;
   Simulator::Schedule(Seconds(0.05),&ThroughputMonitor, stream , fmhelper, flowMon);
-  {
-    flowMon->SerializeToXmlFile ("ThroughputMonitor.xml", true, true);
-  }
 }
 void menu()
 {
@@ -412,20 +409,9 @@ main (int argc, char *argv[])
   flowMonitor = flowHelper.InstallAll();
 
   ThroughputMonitor(total_bytes_data, &flowHelper, flowMonitor); //Call ThroughputMonitor Function
-  flowMonitor->SerializeToXmlFile("FlowMonitor-Throughput.xml", true, true);
-
-
 
   Simulator::Stop (Seconds (simulation_time));
   Simulator::Run ();
-
-  //Analysis of simulation
-  flowMonitor->CheckForLostPackets ();
-  Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier> (flowHelper.GetClassifier ());
-  std::map<FlowId, FlowMonitor::FlowStats> stats = flowMonitor->GetFlowStats ();
-  std::map<FlowId, FlowMonitor::FlowStats>::const_iterator iter;
-  flowMonitor->SerializeToXmlFile("lab-4.xml", true, true);
-
   Simulator::Destroy ();
 
   return 0;
