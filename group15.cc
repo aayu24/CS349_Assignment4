@@ -179,8 +179,8 @@ void ThroughputMonitor (Ptr<OutputStreamWrapper> stream, FlowMonitorHelper *fmhe
     localThrou += stats->second.rxBytes;
   }
   *stream->GetStream() << time << "\t" << ((double)localThrou/1000) << '\n';
-  time += 0.005;
-  Simulator::Schedule(Seconds(0.005),&ThroughputMonitor, stream , fmhelper, flowMon);
+  time += 0.05;
+  Simulator::Schedule(Seconds(0.05),&ThroughputMonitor, stream , fmhelper, flowMon);
   {
     flowMon->SerializeToXmlFile ("ThroughputMonitor.xml", true, true);
   }
@@ -298,7 +298,7 @@ main (int argc, char *argv[])
 
 
   Ptr<RateErrorModel> error_model = CreateObject<RateErrorModel> ();
-  error_model->SetAttribute ("ErrorRate", DoubleValue (0.00001));
+  error_model->SetAttribute ("ErrorRate", DoubleValue (0.0001));
   devices.Get (1)->SetAttribute ("ReceiveErrorModel", PointerValue (error_model));
 
   Ipv4AddressHelper address;
